@@ -1,0 +1,79 @@
+name: Build SDL3 32-bit Static
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: SDL3 3.4.18 - Windows x86 Static
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout SDL 3.4.18
+        uses: actions/checkout@v4
+        with:
+          ref: 3.4.18
+
+      - name: Install MinGW-w64 i686 toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            ninja-build \
+            gcc-mingw-w64-i686 \
+            g++-mingw-w64-i686 \
+            binutils-mingw-w64-i686
+
+      - name: Configure
+        run: |
+          cmake -S . -B build \
+            -G Ninja \
+            -DCMAKE_SYSTEM_NAME=Windows \
+            -DCMAKE_SYSTEM_PROCESSOR=x86 \
+            -DCMAKE_C_COMPILER=i686-w64-mingw32-gcc \
+            -DCMAKE_CXX_COMPILER=i686-w64-mingw32-g++ \
+            -DCMAKE_RC_COMPILER=i686-w64-mingw32-windres \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DSDL_SHARED=OFF \
+            -DSDL_STATIC=ON \
+            -DSDL_TESTS=OFF \
+            -DSDL_EXAMPLES=OFF \
+            -DSDL_TEST_LIBRARY=OFF
+
+      - name: Build
+        run: |
+          cmake --build build --parallel
+
+      - name: Install
+        run: |
+          cmake --install build --prefix dist
+
+      - name: Verify architecture
+        run: |
+          echo "=== Static library ==="
+          file dist/lib/libSDL3.a
+
+          echo "=== Object architecture ==="
+          ar t dist/lib/libSDL3.a | head
+
+          echo "=== Compiler ==="
+          i686-w64-mingw32-gcc --version
+
+      - name: Create package
+        run: |
+          mkdir -p package
+
+          cp -r dist/include package/
+          cp -r dist/lib package/
+
+          cp LICENSE.txt package/ 2>/dev/null || true
+          cp README.md package/ 2>/dev/null || true
+
+          tar -czf SDL3-3.4.18-win32-static-mingw.tar.gz \
+            -C package .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SDL3-3.4.18-win32-static-mingw
+          path: SDL3-3.4.18-win32-static-mingw.tar.gz
